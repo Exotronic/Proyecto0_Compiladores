@@ -14,7 +14,7 @@ LIBS=-lm
  
 PTHREAD=-pthread
  
-CCFLAGS=$(DEBUG) $(OPT) $(WARN) $(PTHREAD) -pipe
+CCFLAGS=$(DEBUG) $(OPT) $(WARN) $(PTHREAD) -pipe -fno-stack-protector -w
  
 # linker
 LD=gcc
