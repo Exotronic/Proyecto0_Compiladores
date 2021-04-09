@@ -594,38 +594,54 @@ void finish(void) {
 
 // Escribe el codigo ensamblador para hacer una asignacion de un valor.
 void assign(expr_rec target, expr_rec source_expr) {
-	// Generar el codigo de la asignacion.
-	if (target.kind == LITERALEXPR) {
-		semantic_error();
+	/* Generate code for assigment */
+	if (source_expr.kind == LITERALEXPR && target.kind == IDEXPR) {
+		if (!lookup(target.name)) {
+			enter(target.name);
+		} else {
+			char *tmp_reg = get_temp();
+			fprintf(output, "\tldr r0, dir_%s\n\tmov r1, #%s", tmp_reg, extract(source_expr));
+            fprintf(output, "\tldr r2, [r1]\n\tstr r2, [r0]\n");
+			//fprintf(output, "sw %s, %s\n", tmp_reg, target.name);
+		}
 	}
 
-	if (source_expr.kind == LITERALEXPR) {
-		//check_id(target.name);
+    /* 
+            fprintf(output, "\tldr r2, dir_"); // ldr r2, dir_<name>
+			fprintf(output, extract(e1));
+			fprintf(output, "\n");
+			fprintf(output, "\tldr r1, [r2]\n"); // ldr r1, [r2]
+    */
 
-		fprintf(output, "\tldr r0, adr_");
-		fprintf(output, target.name);
-		fprintf(output, "\n");
+	if (source_expr.kind == LITERALEXPR && target.kind == TEMPEXPR) {
+		fprintf(output, "\tmov r0, dir_%s\n\tmov r1, #%s", target.name, extract(source_expr));
+	}
 
-		fprintf(output, "\tmov r1, #");
-		fprintf(output, extract(source_expr));
-		fprintf(output, "\n");
+	if (source_expr.kind == IDEXPR && target.kind == TEMPEXPR) {
+		fprintf(output, "\tldr r2, dir_%s\n\tstr %s, r3", target.name, extract(source_expr)); // doubt
+	}
 
-		fprintf(output, "\tstr r1, [r0]\n");
-	} else {
-		if (!lookup(source_expr.name)) {
-			semantic_error();
+	if (source_expr.kind == IDEXPR && target.kind == IDEXPR) {
+		char *tmp_reg = get_temp();
+		if (!lookup(target.name)) {
+			enter(target.name);
 		}
-		//check_id(target.name);
+        fprintf(output, "\tldr r4, dir_%s\n\tmov r5, #%s", tmp_reg, extract(source_expr));
+        fprintf(output, "\tldr r6, [r5]\n\tstr r6, [r4]\n");
+		///fprintf(output, "lw %s, %s\n", tmp_reg, extract(source_expr));
+		//fprintf(output, "sw %s, %s\n", tmp_reg, target.name);
+	}
 
-		fprintf(output, "\tldr r0, adr_");
-		fprintf(output, target.name);
-		fprintf(output, "\n");
+	if (source_expr.kind == TEMPEXPR && target.kind == IDEXPR) {
+		if (!lookup(target.name)) {
+			enter(target.name);
+		}
+		fprintf(output, "\tldr r8, dir_%s\n\tmov r9, #%s", extract(source_expr), target.name);
+        fprintf(output, "\tldr r10, [r9]\n\tstr r10, [r8]\n");
+	}
 
-		fprintf(output, "\tldr r1, adr_");
-		fprintf(output, source_expr.name);
-		fprintf(output, "\n");
-
-		fprintf(output, "\tldr r2, [r1]\n\tstr r2, [r0]\n");
+	if (source_expr.kind == TEMPEXPR && target.kind == TEMPEXPR) {
+		fprintf(output, "\tmov %s, %s\n", target.name, extract(source_expr));
 	}
 }
 
