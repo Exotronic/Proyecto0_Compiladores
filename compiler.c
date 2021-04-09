@@ -113,6 +113,7 @@ token scanner(void) {
 	clear_buffer();
 
 	if (feof(input)) {
+		printf("caca");
 		return SCANEOF;
 	}
 
@@ -262,7 +263,8 @@ token check_reserved() {
 void system_goal(void) {
 	/* <system goal> ::= <program> SCANEOF */
 	program();
-	match(SCANEOF);
+	printf("Hola?");
+	//match(SCANEOF);
 }
 
 void program(void) {
@@ -272,6 +274,8 @@ void program(void) {
 	match(BEGIN);
 	statement_list();
 	match(END);
+
+	finish();
 }
 
 void statement_list(void) {
@@ -322,6 +326,7 @@ void statement(void) {
 			match(SEMICOLON);
 			break;
 		default:
+			printf("Aqui 1");
 			syntax_error();
 			break;
 	}
@@ -415,6 +420,7 @@ op_rec add_op(void) {
 		op = process_op(token_buffer.token);
 		return op;
 	} else {
+		printf("Aqui 2");
 		syntax_error();
 	}
 	return op;
@@ -449,6 +455,7 @@ expr_rec primary(expr_rec target) {
 			break;
 
 		default:
+			printf("aqui 3");
 			syntax_error();
 			break;
 	}
@@ -459,18 +466,15 @@ expr_rec primary(expr_rec target) {
 // Verificar que el token gramatico es igual al del programa.
 void match(token t) {
 	if(temp_token == NULL) {
-		if (scanner() == t) {
-			current_token = t;
-		} else {
-			syntax_error();
-		}
+		current_token = scanner();
 	} else {
-		if (*temp_token == t) {
-			current_token = *temp_token;
-			temp_token = NULL;
-		} else {
-			syntax_error();
-		}
+		current_token = *temp_token;
+		temp_token = NULL;
+	}
+
+	if (t != current_token) {
+		printf("Aqui 4 %d", t);
+		syntax_error();
 	}
 }
 
@@ -551,10 +555,10 @@ void finish(void) {
 		}
 		char var_name[] = "\nadr_";
 		strcat(var_name, symbol_table[i]);
-		fprintf(temp_data_stg, var_name);
+		fprintf(output, var_name);
 
-		fprintf(temp_data_stg, ": .word ");
-		fprintf(temp_data_stg, symbol_table[i]);
+		fprintf(output, ": .word ");
+		fprintf(output, symbol_table[i]);
 	}
 
 	fprintf(temp_data_stg, "\n.data\n");
@@ -563,10 +567,11 @@ void finish(void) {
 			break;
 		}
 
-		fprintf(temp_data_stg, symbol_table[j]);
-		fprintf(temp_data_stg, ": .word 0\n");
+		fprintf(output, symbol_table[j]);
+		fprintf(output, ": .word 0\n");
 	}
 
+	/*
 	// Determinar el tamano del archivo.
 	fseek(temp_data_stg, 0, SEEK_END);
 	file_size = ftell(temp_data_stg);
@@ -585,7 +590,7 @@ void finish(void) {
 	// Ahora todo el archivo esta en el buffer.
 	fprintf(output, buffer);
 	fprintf(output, "\n");
-
+*/
 	fprintf(output, "string_: .asciz \"%d\\n\"\n");
 	fprintf(output, "fmtInput_: .string \"%d\"");
 	fprintf(output, "\n");
@@ -600,7 +605,7 @@ void assign(expr_rec target, expr_rec source_expr) {
 			enter(target.name);
 		} else {
 			char *tmp_reg = get_temp();
-			fprintf(output, "\tldr r0, dir_%s\n\tmov r1, #%s", tmp_reg, extract(source_expr));
+			fprintf(output, "\tldr r0, adr_%s\n\tmov r1, #%s", tmp_reg, extract(source_expr));
             fprintf(output, "\tldr r2, [r1]\n\tstr r2, [r0]\n");
 			//fprintf(output, "sw %s, %s\n", tmp_reg, target.name);
 		}
@@ -614,11 +619,11 @@ void assign(expr_rec target, expr_rec source_expr) {
     */
 
 	if (source_expr.kind == LITERALEXPR && target.kind == TEMPEXPR) {
-		fprintf(output, "\tmov r0, dir_%s\n\tmov r1, #%s", target.name, extract(source_expr));
+		fprintf(output, "\tmov r0, adr_%s\n\tmov r1, #%s", target.name, extract(source_expr));
 	}
 
 	if (source_expr.kind == IDEXPR && target.kind == TEMPEXPR) {
-		fprintf(output, "\tldr r2, dir_%s\n\tstr %s, r3", target.name, extract(source_expr)); // doubt
+		fprintf(output, "\tldr r2, adr_%s\n\tstr %s, r3", target.name, extract(source_expr)); // doubt
 	}
 
 	if (source_expr.kind == IDEXPR && target.kind == IDEXPR) {
@@ -626,7 +631,7 @@ void assign(expr_rec target, expr_rec source_expr) {
 		if (!lookup(target.name)) {
 			enter(target.name);
 		}
-        fprintf(output, "\tldr r4, dir_%s\n\tmov r5, #%s", tmp_reg, extract(source_expr));
+        fprintf(output, "\tldr r4, adr_%s\n\tmov r5, #%s", tmp_reg, extract(source_expr));
         fprintf(output, "\tldr r6, [r5]\n\tstr r6, [r4]\n");
 		///fprintf(output, "lw %s, %s\n", tmp_reg, extract(source_expr));
 		//fprintf(output, "sw %s, %s\n", tmp_reg, target.name);
@@ -636,7 +641,7 @@ void assign(expr_rec target, expr_rec source_expr) {
 		if (!lookup(target.name)) {
 			enter(target.name);
 		}
-		fprintf(output, "\tldr r8, dir_%s\n\tmov r9, #%s", extract(source_expr), target.name);
+		fprintf(output, "\tldr r8, adr_%s\n\tmov r9, #%s", extract(source_expr), target.name);
         fprintf(output, "\tldr r10, [r9]\n\tstr r10, [r8]\n");
 	}
 
@@ -644,6 +649,7 @@ void assign(expr_rec target, expr_rec source_expr) {
 		fprintf(output, "\tmov %s, %s\n", target.name, extract(source_expr));
 	}
 }
+
 
 op_rec process_op() { 
 	// Produce el operador descriptor.
