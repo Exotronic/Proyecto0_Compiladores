@@ -157,7 +157,7 @@ void buffer_char(char c) {
 }
 
 // Limpiar el buffer
-void clear_buffer() {
+void clear_buffer(void) {
 	free(token_buffer.token);
 	token_buffer.token = NULL;
 }
@@ -191,3 +191,19 @@ token check_reserved(void) {
 /*				SEMANTICS			*/
 
 /*				ERRORS				*/
+
+// Error lexico
+void lexical_error(void) {
+	printf(">> A lexical error has been found during compile time. \n>> I give up... :/ \n");
+	fclose(input);
+	fclose(output);
+	exit(-1);
+}
+
+// Error sintactico
+void syntax_error(void) {
+	printf(">> A syntax error has been found during compile time. \n>> I give up... :( \n");
+	fclose(input);
+	fclose(output);
+	exit(-1);
+}
