@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 // Macros for character classification.
 #include <ctype.h>
 
-#define MAXIDLEN 33;
+#define MAXIDLEN 33
 
 /* 		================		SCANNER			================	*/
 typedef enum token_types {
@@ -31,10 +32,81 @@ FILE *input;
 FILE *output;
 char *output_name;
 
+char symbol_table[2048][MAXIDLEN];
+FILE *temp_data_stg;
+
+buffer token_buffer;
+
+token current_token;
+token *temp_token;
+
 // Palabras reservadas
 const char *reserved_words[] = {"begin", "end", "read", "write"};
 
 line_t line_info = {1, 0};
+
+typedef struct {
+	// Para los operadores.
+	enum op { PLUS, MINUS } operator;
+} op_rec;
+
+// Tipos de expresiones.
+enum expr { IDEXPR, LITERALEXPR, TEMPEXPR };
+
+// Para <primary> y <expression>
+typedef struct {
+	enum expr kind;
+	union {
+		char *name; // Para IDEXPR, TEMPEXPR.
+		int val;	// Para LITERALEXPR.
+	};
+} expr_rec;
+
+// Esta en la tabla de simbolos?
+extern int lookup(char *s);
+
+// Pone el char* en la tabla de simbolos.
+extern void enter(char *s);
+
+//HEADERS
+token scanner(void);
+token check_reserved();
+void buffer_char(char c);
+void clear_buffer();
+
+void lexical_error();
+void syntax_error();
+void semantic_error();
+
+void system_goal(void);
+void program(void);
+void statement_list(void);
+void statement(void);
+void id_list(void);
+void expression(expr_rec *target);
+void expr_list();
+op_rec add_op(void);
+expr_rec primary(expr_rec target);
+void match(token tok);
+token next_token(void);
+
+char *get_temp(void);
+void start(void);
+void finish(void);
+void assign(expr_rec target, expr_rec source);
+
+expr_rec gen_infix(expr_rec e1, op_rec op, expr_rec e2);
+void read_id(expr_rec in_var);
+expr_rec process_id(char *token);
+expr_rec process_temp(char *token);
+expr_rec process_literal(char *token);
+op_rec process_op();
+void write_expr(expr_rec out_expr);
+
+char *extract(expr_rec expr);
+char *extract_op(op_rec expr);
+
+char *remove_extension(const char *filename);
 
 token scanner(void) {
 	int in_char, c;
@@ -48,7 +120,7 @@ token scanner(void) {
 		// Hay que ignorar espacios vacios
 		if (isspace(in_char)) {
 			if (in_char == '\n') {
-				line_info.num++
+				line_info.num++;
 				line_info.offset = ftell(input);
 			}
 			continue;
@@ -129,7 +201,7 @@ token scanner(void) {
 			c = getc(input);
 
 			if (c == '-') {
-				do { in_char = getc(input) } while (in_char != '\n')
+				do { in_char = getc(input); } while (in_char != '\n');
 			} else {
 				buffer_char(in_char);
 				ungetc(c, input);
@@ -150,7 +222,7 @@ void buffer_char(char c) {
 		token_buffer.size++;
 		token_buffer.token = (char *)realloc(token_buffer.token, token_buffer.size * sizeof(char));
 	} else {
-		token_buffer = (char *)calloc(token_buffer.size, sizeof(char));
+		token_buffer.token = (char *)calloc(token_buffer.size, sizeof(char));
 		token_buffer.size = 1;
 	}
 	token_buffer.token[token_buffer.size - 1] = c;
@@ -163,22 +235,22 @@ void clear_buffer(void) {
 }
 
 // Esta funcion revisa si es una palabra reservada o un ID.
-token check_reserved(void) {
+token check_reserved() {
 	for (int i = 0; i < 4; ++i) {
 		if (!strcmp(reserved_words[i], token_buffer.token)) {
 			switch (i) {
 				case 0:
 					return BEGIN;
-					break;
+					//break;
 				case 1:
 					return END;
-					break;
+					//break;
 				case 2:
 					return READ;
-					break;
+					//break;
 				case 3:
 					return WRITE;
-					break;
+					//break;
 			}
 		}
 	}
@@ -207,7 +279,7 @@ void statement_list(void) {
 	 *	<statement list> ::= <statement> { <statement> }
 	 */
 	statement();
-	while (true) {
+	while (1) {
 		switch (next_token()) {
 			case ID:
 			case READ:
@@ -230,7 +302,7 @@ void statement(void) {
 			match(ID);
 			expr_rec id = process_id(token_buffer.token);
 			match(ASSIGNOP);
-			expression(&id, 0);
+			expression(&id);
 			match(SEMICOLON);
 			break;
 		case READ:
@@ -294,7 +366,7 @@ void expression(expr_rec *target) {
 		char *tmp = get_temp();
 		expr_rec tmp_expr = process_temp(tmp);
 
-		target = &tmp_expr
+		target = &tmp_expr;
 
 		print_flag = 1;
 	}
@@ -416,35 +488,6 @@ token next_token(void) {
 }
 
 /*		================		SEMANTICS		================	*/
-typedef struct {
-	// Para los operadores.
-	enum op { PLUS, MINUS } operator;
-} op_rec;
-
-// Tipos de expresiones.
-enum expr { IDEXPR, LITERALEXPR, TEMPEXPR };
-
-// Para <primary> y <expression>
-typedef struct {
-	enum expr kind;
-	union {
-		char *name; // Para IDEXPR, TEMPEXPR.
-		int val;	// Para LITERALEXPR.
-	};
-} expr_rec;
-
-char symbol_table[2048][MAXIDLEN];
-FILE *temp_data_stg;
-
-// Esta en la tabla de simbolos?
-extern int lookup(char *s);
-
-// Pone el char* en la tabla de simbolos.
-extern void enter(char *s);
-
-token current_token;
-token *temp_token;
-
 // Revisa si una variable ha sido definida previamente.
 int lookup(char *s) {
 	char *symbol;
@@ -474,17 +517,6 @@ char *get_temp(void) {
 	sprintf(tempname, "$t%d", max_temp);
 	max_temp++;
 	return tempname;
-}
-
-char *get_label(void) {
-	// Maxima etiqueta alocada por ahora.
-	static int max_label = 0;
-	static char label[MAXIDLEN];
-
-	sprintf(label, ".label%d", max_label);
-	max_label++;
-
-	return label;
 }
 
 void start(void) {
@@ -527,11 +559,11 @@ void finish(void) {
 
 	fprintf(temp_data_stg, "\n.data\n");
 	for (int j = 0; j < length; j++) {
-		if (symbol_table[i][0] == '\0') {
+		if (symbol_table[j][0] == '\0') {
 			break;
 		}
 
-		fprintf(temp_data_stg, symbol_table[i]);
+		fprintf(temp_data_stg, symbol_table[j]);
 		fprintf(temp_data_stg, ": .word 0\n");
 	}
 
@@ -567,30 +599,30 @@ void assign(expr_rec target, expr_rec source_expr) {
 		semantic_error();
 	}
 
-	if (source.kind == LITERALEXPR) {
-		check_id(target.name);
+	if (source_expr.kind == LITERALEXPR) {
+		//check_id(target.name);
 
 		fprintf(output, "\tldr r0, adr_");
 		fprintf(output, target.name);
 		fprintf(output, "\n");
 
 		fprintf(output, "\tmov r1, #");
-		fprintf(output, extract(source));
+		fprintf(output, extract(source_expr));
 		fprintf(output, "\n");
 
 		fprintf(output, "\tstr r1, [r0]\n");
 	} else {
-		if (!lookup(source.name)) {
+		if (!lookup(source_expr.name)) {
 			semantic_error();
 		}
-		check_id(target.name);
+		//check_id(target.name);
 
 		fprintf(output, "\tldr r0, adr_");
 		fprintf(output, target.name);
 		fprintf(output, "\n");
 
 		fprintf(output, "\tldr r1, adr_");
-		fprintf(output, source.name);
+		fprintf(output, source_expr.name);
 		fprintf(output, "\n");
 
 		fprintf(output, "\tldr r2, [r1]\n\tstr r2, [r0]\n");
@@ -660,12 +692,12 @@ expr_rec gen_infix(expr_rec e1, op_rec op, expr_rec e2) {
 			fprintf(output, extract(e2));
 			fprintf(output, "\n");
 		} else if (e2.kind == IDEXPR) {
-			fprintf(output, "\tldr r3, adr_") // ldr r3, adr_<name>
+			fprintf(output, "\tldr r3, adr_"); // ldr r3, adr_<name>
 			fprintf(output, extract(e2));
 			fprintf(output, "\n");
 			fprintf(output, "\tldr r2, [r3]\n"); // ldr r2, [r3]
 		} else {
-			fprintf(output, "\tldr r3, adr_") // ldr r3, adr_<name>
+			fprintf(output, "\tldr r3, adr_"); // ldr r3, adr_<name>
 			fprintf(output, extract(e2));
 			fprintf(output, "\n");
 			fprintf(output, "\tldr r2, [r3]\n"); // ldr r2, [r3]
@@ -677,7 +709,7 @@ expr_rec gen_infix(expr_rec e1, op_rec op, expr_rec e2) {
 		fprintf(output, "\tldr r1, adr_"); // ldr r1, adr_<temp_name>
 		fprintf(output, e_rec.name);
 		fprintf(output, "\n");
-		fprintf(output, "\tstr r0, [r1]\n") // str r0, [r1]
+		fprintf(output, "\tstr r0, [r1]\n"); // str r0, [r1]
 	}
 
 	return e_rec;
@@ -779,4 +811,45 @@ void semantic_error(void) {
 	fclose(input);
 	fclose(output);
 	exit(-1);
+}
+
+int main(int argc, char const *argv[]){
+	input = fopen(argv[1], "r");
+
+	if (input != NULL) {
+		output_name = remove_extension(argv[1]);
+
+		system_goal();
+
+		fclose(input);
+		fclose(output);
+
+		return 0;
+	} else {
+		printf(">> Something went wrong...\n");
+		return 1;
+	}
+}
+
+char *remove_extension(const char *filename) {
+	char *res;
+	char *final_dot;
+
+	if (filename == NULL) {
+		return NULL;
+	}
+
+	if ((res = malloc(strlen(filename) + 1)) == NULL) {
+		return NULL;
+	}
+
+	strcpy(res, filename);
+
+	final_dot = strrchr(res, '.');
+
+	if (final_dot != NULL) {
+		*final_dot = '\0';
+	}
+
+	return res;
 }
