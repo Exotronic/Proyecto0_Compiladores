@@ -187,35 +187,6 @@ token check_reserved(void) {
 }
 
 /*		================		PARSER		================		*/
-typedef struct {
-	// Para los operadores.
-	enum op { PLUS, MINUS } operator;
-} op_rec;
-
-// Tipos de expresiones.
-enum expr { IDEXPR, LITERALEXPR, TEMPEXPR };
-
-// Para <primary> y <expression>
-typedef struct {
-	enum expr kind;
-	union {
-		char *name; // Para IDEXPR, TEMPEXPR.
-		int val;	// Para LITERALEXPR.
-	};
-} expr_rec;
-
-char symbol_table[2048][MAXIDLEN];
-FILE *temp_data_stg;
-
-// Esta en la tabla de simbolos?
-extern int lookup(char *s);
-
-// Pone el char* en la tabla de simbolos.
-extern void enter(char *s);
-
-token current_token;
-token *temp_token;
-
 void system_goal(void) {
 	/* <system goal> ::= <program> SCANEOF */
 	program();
@@ -445,6 +416,127 @@ token next_token(void) {
 }
 
 /*		================		SEMANTICS		================	*/
+typedef struct {
+	// Para los operadores.
+	enum op { PLUS, MINUS } operator;
+} op_rec;
+
+// Tipos de expresiones.
+enum expr { IDEXPR, LITERALEXPR, TEMPEXPR };
+
+// Para <primary> y <expression>
+typedef struct {
+	enum expr kind;
+	union {
+		char *name; // Para IDEXPR, TEMPEXPR.
+		int val;	// Para LITERALEXPR.
+	};
+} expr_rec;
+
+char symbol_table[2048][MAXIDLEN];
+FILE *temp_data_stg;
+
+// Esta en la tabla de simbolos?
+extern int lookup(char *s);
+
+// Pone el char* en la tabla de simbolos.
+extern void enter(char *s);
+
+token current_token;
+token *temp_token;
+
+// Revisa si una variable ha sido definida previamente.
+int lookup(char *s) {
+	char *symbol;
+	for (int i = 0; i < 2048; i++) {
+		symbol = symbol_table[i];
+		if (symbol != NULL && strcmp(symbol, s) == 0) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// Agrega una variable a la tabla de simbolos.
+void enter(char *s) {
+	static int index = 0;
+	strcpy(symbol_table[index], s);
+	index++;
+}
+
+char *get_temp(void) {
+	// Maximo temporal alocado por ahora.
+	static int max_temp = 0;
+	static char tempname[MAXIDLEN];
+	if (max_temp == 10) {
+		max_temp = 0;
+	}
+	sprintf(tempname, "$t%d", max_temp);
+	max_temp++;
+	return tempname;
+}
+
+char *get_label(void) {
+	// Maxima etiqueta alocada por ahora.
+	static int max_label = 0;
+	static char label[MAXIDLEN];
+
+	sprintf(label, ".label%d", max_label);
+	max_label++;
+
+	return label;
+}
+
+void start(void) {
+	// Inicializaciones semanticas.
+	output = fopen(output_name, "w");
+	if (output != NULL) {
+		temp_data_stg = tmpfile();
+		fprintf(temp_data_stg, ".data\n");
+
+		fprintf(output, ".text\n");
+		fprintf(output, ".globl _start\n");
+		fprintf(output, "_start:\n");
+	} else {
+		printf(">> Error... I don't know what it is, and I cannot do anything, I give up... :( \n");
+		exit(-1);
+	}
+}
+
+void finish(void) {
+	// Generar el codigo para terminar el programa.
+	fprintf(output, "\tmov r7, #1\n\tswi 0\n");
+	fprintf(output, "\n");
+
+	long file_size;
+	char *buffer;
+	size_t result;
+
+	// Determinar el tamano del archivo.
+	fseek(temp_data_stg, 0, SEEK_END);
+	file_size = ftell(temp_data_stg);
+	rewind(temp_data_stg);
+
+	// Reservar memoria para contener el archivo entero.
+	buffer = (char *)malloc(sizeof(char) * file_size);
+	
+
+	// Copiar el archivo al buffer.
+	result = fread(buffer, 1, file_size, temp_data_stg);
+	if (result != file_size) {
+		fputs(">> An error has occurred during a file operation... I give up... :L \n", stderr);
+		exit(3);
+	}
+
+	// Ahora todo el archivo esta en el buffer.
+	fprintf(output, "%s\n", buffer);
+}
+
+// Escribe el codigo ensamblador para hacer una asignacion de un valor.
+void assign(expr_rec target, expr_rec source_expr) {
+	// Generar el codigo de la asignacion.
+
+}
 
 /*		================		ERRORS			================	*/
 
