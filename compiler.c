@@ -512,6 +512,29 @@ void finish(void) {
 	char *buffer;
 	size_t result;
 
+	int length = sizeof(symbol_table)/sizeof(symbol_table[0]);
+	for (int i = 0; i < length; i++) {
+		if (symbol_table[i][0] == '\0') {
+			break;
+		}
+		char var_name[] = "\nadr_";
+		strcat(var_name, symbol_table[i]);
+		fprintf(temp_data_stg, var_name);
+
+		fprintf(temp_data_stg, ": .word ");
+		fprintf(temp_data_stg, symbol_table[i]);
+	}
+
+	fprintf(temp_data_stg, "\n.data\n");
+	for (int j = 0; j < length; j++) {
+		if (symbol_table[i][0] == '\0') {
+			break;
+		}
+
+		fprintf(temp_data_stg, symbol_table[i]);
+		fprintf(temp_data_stg, ": .word 0\n");
+	}
+
 	// Determinar el tamano del archivo.
 	fseek(temp_data_stg, 0, SEEK_END);
 	file_size = ftell(temp_data_stg);
@@ -520,7 +543,6 @@ void finish(void) {
 	// Reservar memoria para contener el archivo entero.
 	buffer = (char *)malloc(sizeof(char) * file_size);
 	
-
 	// Copiar el archivo al buffer.
 	result = fread(buffer, 1, file_size, temp_data_stg);
 	if (result != file_size) {
@@ -529,13 +551,208 @@ void finish(void) {
 	}
 
 	// Ahora todo el archivo esta en el buffer.
-	fprintf(output, "%s\n", buffer);
+	fprintf(output, buffer);
+	fprintf(output, "\n");
+
+	fprintf(output, "string_: .asciz \"%d\\n\"\n");
+	fprintf(output, "fmtInput_: .string \"%d\"");
+	fprintf(output, "\n");
+
 }
 
 // Escribe el codigo ensamblador para hacer una asignacion de un valor.
 void assign(expr_rec target, expr_rec source_expr) {
 	// Generar el codigo de la asignacion.
+	if (target.kind == LITERALEXPR) {
+		semantic_error();
+	}
 
+	if (source.kind == LITERALEXPR) {
+		check_id(target.name);
+
+		fprintf(output, "\tldr r0, adr_");
+		fprintf(output, target.name);
+		fprintf(output, "\n");
+
+		fprintf(output, "\tmov r1, #");
+		fprintf(output, extract(source));
+		fprintf(output, "\n");
+
+		fprintf(output, "\tstr r1, [r0]\n");
+	} else {
+		if (!lookup(source.name)) {
+			semantic_error();
+		}
+		check_id(target.name);
+
+		fprintf(output, "\tldr r0, adr_");
+		fprintf(output, target.name);
+		fprintf(output, "\n");
+
+		fprintf(output, "\tldr r1, adr_");
+		fprintf(output, source.name);
+		fprintf(output, "\n");
+
+		fprintf(output, "\tldr r2, [r1]\n\tstr r2, [r0]\n");
+	}
+}
+
+op_rec process_op() { 
+	// Produce el operador descriptor.
+	op_rec o;
+
+	if (current_token == PLUSOP) {
+		o.operator = PLUS;
+	} else {
+		o.operator = MINUS;
+	}
+
+	return o;
+}
+
+// Escribe las operaciones en ensamblador.
+expr_rec gen_infix(expr_rec e1, op_rec op, expr_rec e2) {
+	expr_rec e_rec;
+
+	// Arreglar constantes.
+	if (e2.kind == LITERALEXPR && e1.kind == LITERALEXPR) {
+		e_rec.kind = LITERALEXPR;
+
+		if (op.operator == PLUS) {
+			e_rec.val = e2.val + e1.val;
+		} else {
+			e_rec.val = e1.val - e2.val;
+		}
+	} else {
+		// Una expr_rec con tipo Temp.
+		e_rec.kind = TEMPEXPR;
+
+		// Genera el codigo por una operacion infix.
+		// Se obtiene el resultado y se crea un record semantico para este.
+
+		char *tempo = get_temp();
+		e_rec.name = malloc(sizeof(tempo));
+
+		strcpy(e_rec.name, tempo);
+		char *tempo_regi1 = malloc(3);
+		char *tempo_regi2 = malloc(3);
+
+		strcpy(tempo_regi1, get_temp());
+		if (e1.kind == LITERALEXPR) {
+			fprintf(output, "\tmov r1, #"); //mov r1, #<literal>
+			fprintf(output, extract(e1));
+			fprintf(output, "\n");
+		} else if (e1.kind == IDEXPR) {
+			fprintf(output, "\tldr r2, adr_"); // ldr r2, adr_<name>
+			fprintf(output, extract(e1));
+			fprintf(output, "\n");
+			fprintf(output, "\tldr r1, [r2]\n"); // ldr r1, [r2]
+		} else {
+			fprintf(output, "\tldr r2, adr_"); // ldr r2, adr_<name>
+			fprintf(output, extract(e1));
+			fprintf(output, "\n");
+			fprintf(output, "\tldr r1, [r2]\n"); // ldr r1, [r2]
+		}
+
+		strcpy(tempo_regi2, get_temp());
+		if (e2.kind == LITERALEXPR) {
+			fprintf(output, "\tmov r2, #"); //mov r2, #<literal>
+			fprintf(output, extract(e2));
+			fprintf(output, "\n");
+		} else if (e2.kind == IDEXPR) {
+			fprintf(output, "\tldr r3, adr_") // ldr r3, adr_<name>
+			fprintf(output, extract(e2));
+			fprintf(output, "\n");
+			fprintf(output, "\tldr r2, [r3]\n"); // ldr r2, [r3]
+		} else {
+			fprintf(output, "\tldr r3, adr_") // ldr r3, adr_<name>
+			fprintf(output, extract(e2));
+			fprintf(output, "\n");
+			fprintf(output, "\tldr r2, [r3]\n"); // ldr r2, [r3]
+		}
+
+		fprintf(output, "\t");
+		fprintf(output, extract_op(op)); // add r0, r1, r2 // sub r0, r1, r2
+		fprintf(output, " r0, r1, r2\n");
+		fprintf(output, "\tldr r1, adr_"); // ldr r1, adr_<temp_name>
+		fprintf(output, e_rec.name);
+		fprintf(output, "\n");
+		fprintf(output, "\tstr r0, [r1]\n") // str r0, [r1]
+	}
+
+	return e_rec;
+}
+
+// Escribe la operacion para leer de stdin.
+void read_id(expr_rec in_var) {
+
+}
+
+expr_rec process_id(char *token) {
+	expr_rec tok;
+
+	// Declara un ID y construye el record semantico correspondiente.
+
+	tok.kind = IDEXPR;
+	tok.name = malloc(sizeof(token));
+	strcpy(tok.name, token);
+	
+	return tok;
+}
+
+expr_rec process_temp(char *token) {
+	expr_rec tok;
+
+	// Declara un ID y construye el record semantico correspondiente.
+
+	tok.kind = TEMPEXPR;
+	tok.name = malloc(sizeof(token));
+	strcpy(tok.name, token);
+
+	return tok;
+}
+
+expr_rec process_literal(char *token) {
+	expr_rec tok;
+
+	// Convierte un literal en una representacion numerica y construye el record semantico correspondiente.
+
+	tok.kind = LITERALEXPR;
+	sscanf(token, "%d", &tok.val);
+
+	return tok;
+}
+
+// Escribe una expresion en el archivo ensamblador.
+void write_expr(expr_rec out_expr) {
+
+}
+
+// Extrae la informacion de una expresion.
+char *extract(expr_rec expr) {
+	char *data = NULL;
+
+	if (expr.kind == TEMPEXPR || expr.kind == IDEXPR) {
+		data = expr.name;
+	} else {
+		data = malloc(sizeof(int));
+		sprintf(data, "%d", expr.val);
+	}
+
+	return data;
+}
+
+// Extrae la operacion de una expresion.
+char *extract_op(op_rec op) {
+	char *operation;
+
+	if (op.operator == PLUS) {
+		operation = "add";
+	} else {
+		operation = "sub";
+	}
+
+	return operation;
 }
 
 /*		================		ERRORS			================	*/
