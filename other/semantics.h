@@ -38,13 +38,13 @@ void start(void);
 void finish(void);
 void assign(expr_rec target, expr_rec source);
 
+void write_expr(expr_rec out_expr);
 expr_rec gen_infix(expr_rec e1, op_rec op, expr_rec e2);
 void read_id(expr_rec in_var);
 expr_rec process_id(char *token);
 expr_rec process_temp(char *token);
 expr_rec process_literal(char *token);
 op_rec process_op();
-void write_expr(expr_rec out_expr);
 
 char *extract(expr_rec expr);
 char *extract_op(op_rec expr);

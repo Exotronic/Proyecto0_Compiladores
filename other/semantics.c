@@ -27,7 +27,7 @@ char *get_temp(void) {
 	if (max_temp == 10) {
 		max_temp = 0;
 	}
-	sprintf(tempname, "$t%d", max_temp);
+	sprintf(tempname, "t$%d", max_temp);
 	max_temp++;
 	return tempname;
 }
@@ -40,8 +40,8 @@ void start(void) {
 		fprintf(temp_data_stg, ".data\n");
 
 		fprintf(output, ".text\n");
-		fprintf(output, ".globl _start\n");
-		fprintf(output, "_start:\n");
+		fprintf(output, ".global main\n\n");
+		fprintf(output, "main:\n");
 
 		int length = sizeof(symbol_table)/sizeof(symbol_table[0]);
 		for (int i = 0; i < length; i++) {
@@ -58,41 +58,10 @@ void finish(void) {
 	fprintf(output, "\tmov r7, #1\n\tswi 0\n");
 	fprintf(output, "\n");
 
-	//long file_size;
-	//char *buffer;
-	//size_t result;
-
-	printf("??\n");
-	int length = 1024;
-	printf("%d?\n",  length);
-	//int length = 2048;
-
-	printf("antes del for");
-	for (int i = 0; i < length; i++) {
-		printf("???\n");
-		if (symbol_table[i][0] == '\0') {
-			break;
-		}
-		printf("????\n");
-		char var_name[] = "\nadr_";
-		strcat(var_name, symbol_table[i]);
-		fprintf(output, var_name);
-
-		fprintf(output, ": .word ");
-		fprintf(output, symbol_table[i]);
-	}
-
-	fprintf(output, "\n.data\n");
-	for (int j = 0; j < length; j++) {
-		if (symbol_table[j][0] == '\0') {
-			break;
-		}
-
-		fprintf(output, symbol_table[j]);
-		fprintf(output, ": .word 0\n");
-	} 
-
-	/*
+	long file_size;
+	char *buffer;
+	size_t result;
+	
 	// Determinar el tamano del archivo.
 	fseek(temp_data_stg, 0, SEEK_END);
 	file_size = ftell(temp_data_stg);
@@ -111,9 +80,9 @@ void finish(void) {
 	// Ahora todo el archivo esta en el buffer.
 	fprintf(output, buffer);
 	fprintf(output, "\n");
-*/
-	fprintf(output, "string_: .asciz \"%d\\n\"\n");
-	fprintf(output, "fmtInput_: .string \"%d\"");
+
+	fprintf(output, "string: .asciz \"%%d\\n\"\n");
+	fprintf(output, "input: .string \"%%d\"");
 	fprintf(output, "\n");
 
 }
@@ -124,6 +93,7 @@ void assign(expr_rec target, expr_rec source_expr) {
 	if (source_expr.kind == LITERALEXPR && target.kind == IDEXPR) {
 		if (!lookup(target.name)) {
 			enter(target.name);
+			fprintf(temp_data_stg, "dir_%s: .word 0\n", target.name);
 		} else {
 			fprintf(output, "\n\tldr r0, =dir_");
 			fprintf(output, extract(target));
@@ -134,24 +104,37 @@ void assign(expr_rec target, expr_rec source_expr) {
 			fprintf(output, "\n");
 
 			fprintf(output, "\tmov r2, r1\n");
-			fprintf(output, "\tstr r2, [r0]");
+			fprintf(output, "\tstr r2, [r0]\n");
 		}
 	}
 
 	if (source_expr.kind == LITERALEXPR && target.kind == TEMPEXPR) {
-		fprintf(output, "\tmov r0, adr_%s\n\tmov r1, #%s", target.name, extract(source_expr));
+		fprintf(output, "\n\tldr r0, =");
+		fprintf(output, extract(target));
+		fprintf(output, "\n");
+
+		fprintf(output, "\tldr r1, =");
+		fprintf(output, extract(source_expr));
+		fprintf(output, "\n");
+
+		fprintf(output, "\tmov r2, r1\n");
+		fprintf(output, "\tstr r2, [r0]\n");
 	}
 
 	if (source_expr.kind == IDEXPR && target.kind == TEMPEXPR) {
-		fprintf(output, "\tldr r2, adr_%s\n\tstr %s, r3", target.name, extract(source_expr)); // doubt
+		fprintf(output, "\tldr r2, =dir_%s\n\tstr %s, r3", target.name, extract(source_expr)); // doubt
 	}
 
 	if (source_expr.kind == IDEXPR && target.kind == IDEXPR) {
 		char *tmp_reg = get_temp();
+		enter(tmp_reg);
+		fprintf(temp_data_stg, "%s: .word 0\n", tmp_reg);
+
 		if (!lookup(target.name)) {
 			enter(target.name);
+			fprintf(temp_data_stg, "dir_%s: .word 0\n", target.name);
 		}
-        fprintf(output, "\tldr r4, adr_%s\n\tmov r5, #%s", tmp_reg, extract(source_expr));
+        fprintf(output, "\tldr r4, =%s\n\tmov r5, #%s", tmp_reg, extract(source_expr));
         fprintf(output, "\tldr r6, [r5]\n\tstr r6, [r4]\n");
 		///fprintf(output, "lw %s, %s\n", tmp_reg, extract(source_expr));
 		//fprintf(output, "sw %s, %s\n", tmp_reg, target.name);
@@ -160,9 +143,18 @@ void assign(expr_rec target, expr_rec source_expr) {
 	if (source_expr.kind == TEMPEXPR && target.kind == IDEXPR) {
 		if (!lookup(target.name)) {
 			enter(target.name);
+			fprintf(temp_data_stg, "dir_%s: .word 0\n", target.name);
 		}
-		fprintf(output, "\tldr r8, adr_%s\n\tmov r9, #%s", extract(source_expr), target.name);
-        fprintf(output, "\tldr r10, [r9]\n\tstr r10, [r8]\n");
+		fprintf(output, "\n\tldr r8, =");
+		fprintf(output, extract(source_expr));
+		fprintf(output, "\n");
+
+		fprintf(output, "\tldr r9, =dir_");
+		fprintf(output, target.name);
+		fprintf(output, "\n");
+
+		fprintf(output, "\tldr r10, [r8]\n");
+		fprintf(output, "\tstr r10, [r9]\n");
 	}
 
 	if (source_expr.kind == TEMPEXPR && target.kind == TEMPEXPR) {
@@ -205,6 +197,8 @@ expr_rec gen_infix(expr_rec e1, op_rec op, expr_rec e2) {
 		// Se obtiene el resultado y se crea un record semantico para este.
 
 		strcpy(e_rec.name, get_temp());
+		enter(e_rec.name);
+		fprintf(temp_data_stg, "%s: .word 0\n", e_rec.name);
 		if (e1.kind == LITERALEXPR) {
 			// ldr r1, =<e1>
 			fprintf(output, "\n\tldr r1, =");
@@ -235,7 +229,7 @@ expr_rec gen_infix(expr_rec e1, op_rec op, expr_rec e2) {
 			fprintf(output, "\n");
 		} else if (e2.kind == IDEXPR) {
 			// ldr r3, =dir_<e2>
-			fprintf(output, "\n\tldr r3, =dir_");
+			fprintf(output, "\n\tldr r3, =");
 			fprintf(output, extract(e2));
 			fprintf(output, "\n");
 
@@ -254,7 +248,7 @@ expr_rec gen_infix(expr_rec e1, op_rec op, expr_rec e2) {
 		fprintf(output, "\t");
 		fprintf(output, extract_op(op)); // add r0, r1, r2 // sub r0, r1, r2
 		fprintf(output, " r0, r1, r2\n");
-		fprintf(output, "\tldr r1, dir_"); // ldr r1, adr_<temp_name>
+		fprintf(output, "\tldr r1, ="); // ldr r1, adr_<temp_name>
 		fprintf(output, e_rec.name);
 		fprintf(output, "\n");
 		fprintf(output, "\tmov r2, r0 \n");
@@ -311,7 +305,7 @@ void write_expr(expr_rec out_expr) {
 
 // Extrae la informacion de una expresion.
 char *extract(expr_rec expr) {
-	char *data = NULL;
+	char *data;
 
 	if (expr.kind == TEMPEXPR || expr.kind == IDEXPR) {
 		data = expr.name;

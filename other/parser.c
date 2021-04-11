@@ -32,7 +32,7 @@ void system_goal(void) {
 	/* <system goal> ::= <program> SCANEOF */
 	program();
 	printf("Hola?");
-	match(SCANEOF);
+	//match(SCANEOF);
 }
 
 void program(void) {
