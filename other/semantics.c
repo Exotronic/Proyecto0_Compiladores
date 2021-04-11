@@ -89,24 +89,35 @@ void finish(void) {
 
 // Escribe el codigo ensamblador para hacer una asignacion de un valor.
 void assign(expr_rec target, expr_rec source_expr) {
-	/* Generate code for assigment */
-	if (source_expr.kind == LITERALEXPR && target.kind == IDEXPR) {
-		if (!lookup(target.name)) {
-			enter(target.name);
-			fprintf(temp_data_stg, "dir_%s: .word 0\n", target.name);
-		} else {
-			fprintf(output, "\n\tldr r0, =dir_");
-			fprintf(output, extract(target));
-			fprintf(output, "\n");
+    /* Generate code for assigment */
+    if (source_expr.kind == LITERALEXPR && target.kind == IDEXPR) {
+        if (!lookup(target.name)) {
+            enter(target.name);
+            fprintf(temp_data_stg, "dir_%s: .word 0\n", target.name);
 
-			fprintf(output, "\tldr r1, =");
-			fprintf(output, extract(source_expr));
-			fprintf(output, "\n");
+            fprintf(output, "\n\tldr r0, =dir_");
+            fprintf(output, extract(target));
+            fprintf(output, "\n");
 
-			fprintf(output, "\tmov r2, r1\n");
-			fprintf(output, "\tstr r2, [r0]\n");
-		}
-	}
+            fprintf(output, "\tldr r1, =");
+            fprintf(output, extract(source_expr));
+            fprintf(output, "\n");
+
+            fprintf(output, "\tmov r2, r1\n");
+            fprintf(output, "\tstr r2, [r0]\n");
+        } else {
+            fprintf(output, "\n\tldr r0, =dir_");
+            fprintf(output, extract(target));
+            fprintf(output, "\n");
+
+            fprintf(output, "\tldr r1, =");
+            fprintf(output, extract(source_expr));
+            fprintf(output, "\n");
+
+            fprintf(output, "\tmov r2, r1\n");
+            fprintf(output, "\tstr r2, [r0]\n");
+        }
+    }
 
 	if (source_expr.kind == LITERALEXPR && target.kind == TEMPEXPR) {
 		fprintf(output, "\n\tldr r0, =");
@@ -122,7 +133,11 @@ void assign(expr_rec target, expr_rec source_expr) {
 	}
 
 	if (source_expr.kind == IDEXPR && target.kind == TEMPEXPR) {
-		fprintf(output, "\tldr r2, =dir_%s\n\tstr %s, r3", target.name, extract(source_expr)); // doubt
+		fprintf(output, "\tldr r2, =%s\n", target.name);
+
+		fprintf(output, "\tldr r3, =dir_"); ///
+		fprintf(output, extract(source_expr)); 
+		fprintf(output, "\n");
 	}
 
 	if (source_expr.kind == IDEXPR && target.kind == IDEXPR) {
@@ -134,10 +149,9 @@ void assign(expr_rec target, expr_rec source_expr) {
 			enter(target.name);
 			fprintf(temp_data_stg, "dir_%s: .word 0\n", target.name);
 		}
-        fprintf(output, "\tldr r4, =%s\n\tmov r5, #%s", tmp_reg, extract(source_expr));
+        fprintf(output, "\tldr r4, =%s\n", tmp_reg);
+		fprintf(output, "\tmov r5, #%s", extract(source_expr));
         fprintf(output, "\tldr r6, [r5]\n\tstr r6, [r4]\n");
-		///fprintf(output, "lw %s, %s\n", tmp_reg, extract(source_expr));
-		//fprintf(output, "sw %s, %s\n", tmp_reg, target.name);
 	}
 
 	if (source_expr.kind == TEMPEXPR && target.kind == IDEXPR) {
@@ -229,7 +243,7 @@ expr_rec gen_infix(expr_rec e1, op_rec op, expr_rec e2) {
 			fprintf(output, "\n");
 		} else if (e2.kind == IDEXPR) {
 			// ldr r3, =dir_<e2>
-			fprintf(output, "\n\tldr r3, =");
+			fprintf(output, "\n\tldr r3, ="); ///
 			fprintf(output, extract(e2));
 			fprintf(output, "\n");
 
@@ -260,7 +274,9 @@ expr_rec gen_infix(expr_rec e1, op_rec op, expr_rec e2) {
 
 // Escribe la operacion para leer de stdin.
 void read_id(expr_rec in_var) {
-
+	fprintf(output, "\tldr r0, =");
+	fprintf(output, extract(in_var));
+	fprintf(output, "\n\tbl scanf\n");
 }
 
 expr_rec process_id(char *token) {
@@ -300,7 +316,29 @@ expr_rec process_literal(char *token) {
 
 // Escribe una expresion en el archivo ensamblador.
 void write_expr(expr_rec out_expr) {
+	if (out_expr.kind == INTLITERAL) {
+		// ldr r1, =<out_expr>
+		fprintf(output, "\n\tldr r1, =");
+		fprintf(output, extract(out_expr));
+		fprintf(output, "\n");
+	} else if (out_expr.kind == IDEXPR) {
+		// ldr r2, =dir_<out_expr>
+		fprintf(output, "\n\tldr r2, =dir_");
+		fprintf(output, extract(out_expr));
+		fprintf(output, "\n");
 
+		// ldr r1, [r2]
+		fprintf(output, "\tldr r1, [r2]\n");
+	} else {
+		// ldr r2, =<out_expr>
+		fprintf(output, "\n\tldr r2, =");
+		fprintf(output, extract(out_expr));
+		fprintf(output, "\n");
+
+		// ldr r1, [r2]
+		fprintf(output, "\tldr r1, [r2]\n");
+	}
+	fprintf(output, "\tbl printf\n");
 }
 
 // Extrae la informacion de una expresion.
