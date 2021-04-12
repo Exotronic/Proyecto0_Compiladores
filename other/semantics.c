@@ -89,6 +89,7 @@ void finish(void) {
 
 // Escribe el codigo ensamblador para hacer una asignacion de un valor.
 void assign(expr_rec target, expr_rec source_expr) {
+		printf("Target: %s\n", extract(target));
     /* Generate code for assigment */
     if (source_expr.kind == LITERALEXPR && target.kind == IDEXPR) {
         if (!lookup(target.name)) {
@@ -119,7 +120,7 @@ void assign(expr_rec target, expr_rec source_expr) {
         }
     }
 
-	if (source_expr.kind == IDEXPR && target.kind == LITERALEXPR) { ///
+	if (source_expr.kind == IDEXPR && target.kind == LITERALEXPR) { 
         if (!lookup(source_expr.name)) {
             enter(source_expr.name);
             fprintf(temp_data_stg, "dir_%s: .word 0\n", source_expr.name);
@@ -146,9 +147,9 @@ void assign(expr_rec target, expr_rec source_expr) {
             fprintf(output, "\tmov r2, r1\n");
             fprintf(output, "\tstr r2, [r0]\n");
         }
-    } ///
+    } 
 
-	if (source_expr.kind == LITERALEXPR && target.kind == TEMPEXPR) {
+	if (source_expr.kind == LITERALEXPR && target.kind == TEMPEXPR) { 
 		fprintf(output, "\n\tldr r0, =");
 		fprintf(output, extract(target));
 		fprintf(output, "\n");
@@ -161,13 +162,16 @@ void assign(expr_rec target, expr_rec source_expr) {
 		fprintf(output, "\tstr r2, [r0]\n");
 	}
 
-	/*if (source_expr.kind == IDEXPR && target.kind == TEMPEXPR) {
-		fprintf(output, "\tldr r2, =%s\n", target.name);
+	if (source_expr.kind == IDEXPR && target.kind == TEMPEXPR) {
+		fprintf(output, "\tldr r0, =");
+		fprintf(output, extract(target));
+		fprintf(output, "\n");
+		printf("Se metio esta picha\n");
 
-		fprintf(output, "\tldr r3, =dir_"); ///
+		fprintf(output, "\tldr r1, =dir_");
 		fprintf(output, extract(source_expr)); 
 		fprintf(output, "\n");
-	}*/
+	}
 
 	if (source_expr.kind == IDEXPR && target.kind == IDEXPR) {
 		char *tmp_reg = get_temp();
@@ -203,6 +207,7 @@ void assign(expr_rec target, expr_rec source_expr) {
 	if (source_expr.kind == TEMPEXPR && target.kind == TEMPEXPR) {
 		fprintf(output, "\tmov %s, %s\n", target.name, extract(source_expr));
 	}
+	printf("\n");
 }
 
 
@@ -361,7 +366,7 @@ void write_expr(expr_rec out_expr) {
 		fprintf(output, "\tldr r1, [r1]\n");
 	} else {
 		// ldr r2, =<out_expr>
-		fprintf(output, "\tldr r1, =");
+		fprintf(output, "\tldr r1, ="); ///
 		fprintf(output, extract(out_expr));
 		fprintf(output, "\n");
 

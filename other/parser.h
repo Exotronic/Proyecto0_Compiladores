@@ -18,8 +18,8 @@ void program(void);
 void statement_list(void);
 void statement(void);
 void id_list(void);
-void expression(expr_rec *target);
-void expr_list(void);
+void expression(expr_rec *target, int flag);
+void expr_list(token tok);
 op_rec add_op(void);
 expr_rec primary(expr_rec target);
 

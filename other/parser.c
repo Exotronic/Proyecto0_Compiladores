@@ -10,7 +10,7 @@ void match(token t) {
 	}
 
 	if (t != current_token) {
-		printf("Aqui 4 %d", t);
+		printf("Token no es matched %d y %d\n", t, current_token);
 		syntax_error();
 	}
 }
@@ -31,7 +31,7 @@ token next_token(void) {
 void system_goal(void) {
 	/* <system goal> ::= <program> SCANEOF */
 	program();
-	printf("Hola?");
+	//printf("Hola?");
 	//match(SCANEOF);
 }
 
@@ -74,7 +74,7 @@ void statement(void) {
 			match(ID);
 			expr_rec id = process_id(token_buffer.token);
 			match(ASSIGNOP);
-			expression(&id);
+			expression(&id, 0); ////
 			match(SEMICOLON);
 			break;
 		case READ:
@@ -89,7 +89,9 @@ void statement(void) {
 			// <statement> ::= WRITE ( <expr list> ) ;
 			match(WRITE);
 			match(LPAREN);
-			expr_list();
+			//printf("Next token type: %d\n", next_token());
+			//printf("Token en write: %s\n", token_buffer.token);
+			expr_list(next_token());
 			match(RPAREN);
 			match(SEMICOLON);
 			break;
@@ -126,17 +128,34 @@ void id_list(void) {
 }
 
 // Expresiones
-void expression(expr_rec *target) {
+void expression(expr_rec *target, int flag) {
 	/*
 	 *	<expression> ::= <primary> { <add op> <primary> }
 	 */
 
 	token t;
-	int print_flag = 0;
+	int print_flag = flag;
+	if (print_flag) {
+		//printf("Target Kind: %d\n", target->kind);
+		//target->kind = IDEXPR;
+		//printf("Target Kind: %d\n", target->kind);
+		write_expr(*target);
+	} else {
+		expr_rec op1 = primary(*target);
+		for (t = next_token(); t == PLUSOP || t == MINUSOP; t = next_token()) {
+			op_rec op = add_op();
+			expr_rec op2 = primary(*target);
+			op1 = gen_infix(op1, op, op2);
+		}
+		//printf("\n");
+		assign(*target, op1);
+	}
 
+	/*
 	// Si el target es NULL es porque se tiene que imprimir.
     if (target == NULL) {
         char *tmp = get_temp();
+		printf("Temp: %s\n", tmp);
         enter(tmp);
         fprintf(temp_data_stg, "%s: .word 0\n", tmp);
         expr_rec tmp_expr = process_temp(tmp);
@@ -154,40 +173,56 @@ void expression(expr_rec *target) {
 	}
 
 	///////////
-	if (op1.kind == IDEXPR) {
+	printf("Op1 Kind: %d\n", op1.kind);
+	printf("Target Kind: %d\n", target->kind);
+	printf("Print Flag: %d\n", print_flag);
+	//printf("\n");
+	assign(*target, op1);
+	/*if (op1.kind == IDEXPR) {
         char *tmp = get_temp();
         enter(tmp);
         fprintf(temp_data_stg, "%s: .word 0\n", tmp);
         expr_rec tmp_expr = process_temp(tmp);
         assign(tmp_expr, op1);
         *target = tmp_expr;
-    } if (op1.kind == IDEXPR) {
-        char *tmp = get_temp();
-        enter(tmp);
-        fprintf(temp_data_stg, "%s: .word 0\n", tmp);
-        expr_rec tmp_expr = process_temp(tmp);
-        assign(tmp_expr, op1);
-        *target = tmp_expr;
-    }
-
-	else {
+    } else {
 		assign(*target, op1);
-	}
+	}*/
 
-	if (print_flag) {
+	/*if (print_flag) {
+		//printf("Target Kind: %d\n", target->kind);
+		//target->kind = IDEXPR;
+		//printf("Target Kind: %d\n", target->kind);
 		write_expr(*target);
-	}
+	}*/
 }
 
 // Verifica la lista de expresiones.
-void expr_list(void) {
+void expr_list(token tok) {
 	// <expr list> ::= <expression> { , <expression> }
-	expression(NULL);
-
-	while (next_token() == COMMA) {
-		match(COMMA);
-		expression(NULL);
+	expr_rec target;
+	if (tok != RPAREN) {
+		//match(COMMA);
+		if (tok == ID) {
+			match(ID);
+			target = process_id(token_buffer.token);
+			expression(&target, 1);
+		} else if (tok == INTLITERAL) {
+			match(INTLITERAL);
+			target = process_literal(token_buffer.token);
+			expression(&target, 1);
+		}
+		//tok = next_token();
 	}
+	printf("Salio\n");
+	//expression(NULL);
+	//while (next_token() == COMMA)
+
+	/*while (next_token() != RPAREN) {
+		match(COMMA);
+		//expression(NULL);
+		expression(&target, 1);
+	}*/
 }
 
 // Obtiene la operacion de una expression.
@@ -214,7 +249,7 @@ expr_rec primary(expr_rec target) {
 		case LPAREN:
 			// <primary> ::= ( <expression> )
 			match(LPAREN);
-			expression(&target);
+			expression(&target, 0); ////
 			src = target;
 			match(RPAREN);
 			break;
@@ -235,7 +270,7 @@ expr_rec primary(expr_rec target) {
 			break;
 
 		default:
-			printf("aqui 3");
+			printf("Matcheo un token %d\n", tok);
 			syntax_error();
 			break;
 	}
