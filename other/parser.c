@@ -30,6 +30,7 @@ token next_token(void) {
 void system_goal(void) {
 	/* <system goal> ::= <program> SCANEOF */
 	program();
+	//match(SCANEOF);
 }
 
 void program(void) {
@@ -182,7 +183,7 @@ expr_rec primary(expr_rec target) {
 		case LPAREN:
 			// <primary> ::= ( <expression> )
 			match(LPAREN);
-			expression(&target, 0);
+			expression(&target, 0); 
 			src = target;
 			match(RPAREN);
 			break;
