@@ -10,7 +10,6 @@ void match(token t) {
 	}
 
 	if (t != current_token) {
-		printf("Token no es matched %d y %d\n", t, current_token);
 		syntax_error();
 	}
 }
@@ -31,8 +30,6 @@ token next_token(void) {
 void system_goal(void) {
 	/* <system goal> ::= <program> SCANEOF */
 	program();
-	//printf("Hola?");
-	//match(SCANEOF);
 }
 
 void program(void) {
@@ -89,14 +86,11 @@ void statement(void) {
 			// <statement> ::= WRITE ( <expr list> ) ;
 			match(WRITE);
 			match(LPAREN);
-			//printf("Next token type: %d\n", next_token());
-			//printf("Token en write: %s\n", token_buffer.token);
 			expr_list(next_token());
 			match(RPAREN);
 			match(SEMICOLON);
 			break;
 		default:
-			printf("Aqui 1");
 			syntax_error();
 			break;
 	}
@@ -136,9 +130,6 @@ void expression(expr_rec *target, int flag) {
 	token t;
 	int print_flag = flag;
 	if (print_flag) {
-		//printf("Target Kind: %d\n", target->kind);
-		//target->kind = IDEXPR;
-		//printf("Target Kind: %d\n", target->kind);
 		write_expr(*target);
 	} else {
 		expr_rec op1 = primary(*target);
@@ -147,54 +138,8 @@ void expression(expr_rec *target, int flag) {
 			expr_rec op2 = primary(*target);
 			op1 = gen_infix(op1, op, op2);
 		}
-		//printf("\n");
 		assign(*target, op1);
 	}
-
-	/*
-	// Si el target es NULL es porque se tiene que imprimir.
-    if (target == NULL) {
-        char *tmp = get_temp();
-		printf("Temp: %s\n", tmp);
-        enter(tmp);
-        fprintf(temp_data_stg, "%s: .word 0\n", tmp);
-        expr_rec tmp_expr = process_temp(tmp);
-
-        target = &tmp_expr;
-
-        print_flag = 1;
-    }
-
-	expr_rec op1 = primary(*target);
-	for (t = next_token(); t == PLUSOP || t == MINUSOP; t = next_token()) {
-		op_rec op = add_op();
-		expr_rec op2 = primary(*target);
-		op1 = gen_infix(op1, op, op2);
-	}
-
-	///////////
-	printf("Op1 Kind: %d\n", op1.kind);
-	printf("Target Kind: %d\n", target->kind);
-	printf("Print Flag: %d\n", print_flag);
-	//printf("\n");
-	assign(*target, op1);
-	/*if (op1.kind == IDEXPR) {
-        char *tmp = get_temp();
-        enter(tmp);
-        fprintf(temp_data_stg, "%s: .word 0\n", tmp);
-        expr_rec tmp_expr = process_temp(tmp);
-        assign(tmp_expr, op1);
-        *target = tmp_expr;
-    } else {
-		assign(*target, op1);
-	}*/
-
-	/*if (print_flag) {
-		//printf("Target Kind: %d\n", target->kind);
-		//target->kind = IDEXPR;
-		//printf("Target Kind: %d\n", target->kind);
-		write_expr(*target);
-	}*/
 }
 
 // Verifica la lista de expresiones.
@@ -202,7 +147,6 @@ void expr_list(token tok) {
 	// <expr list> ::= <expression> { , <expression> }
 	expr_rec target;
 	if (tok != RPAREN) {
-		//match(COMMA);
 		if (tok == ID) {
 			match(ID);
 			target = process_id(token_buffer.token);
@@ -212,17 +156,7 @@ void expr_list(token tok) {
 			target = process_literal(token_buffer.token);
 			expression(&target, 1);
 		}
-		//tok = next_token();
 	}
-	printf("Salio\n");
-	//expression(NULL);
-	//while (next_token() == COMMA)
-
-	/*while (next_token() != RPAREN) {
-		match(COMMA);
-		//expression(NULL);
-		expression(&target, 1);
-	}*/
 }
 
 // Obtiene la operacion de una expression.
@@ -235,7 +169,6 @@ op_rec add_op(void) {
 		op = process_op(token_buffer.token);
 		return op;
 	} else {
-		printf("Aqui 2");
 		syntax_error();
 	}
 	return op;
@@ -249,7 +182,7 @@ expr_rec primary(expr_rec target) {
 		case LPAREN:
 			// <primary> ::= ( <expression> )
 			match(LPAREN);
-			expression(&target, 0); ////
+			expression(&target, 0);
 			src = target;
 			match(RPAREN);
 			break;
@@ -270,7 +203,6 @@ expr_rec primary(expr_rec target) {
 			break;
 
 		default:
-			printf("Matcheo un token %d\n", tok);
 			syntax_error();
 			break;
 	}
