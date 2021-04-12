@@ -55,7 +55,7 @@ void start(void) {
 
 void finish(void) {
 	// Generar el codigo para terminar el programa.
-	fprintf(output, "\tmov r7, #1\n\tswi 0\n");
+	fprintf(output, "\n\tmov r7, #1\n\tswi 0\n");
 	fprintf(output, "\n");
 
 	long file_size;
@@ -119,6 +119,35 @@ void assign(expr_rec target, expr_rec source_expr) {
         }
     }
 
+	if (source_expr.kind == IDEXPR && target.kind == LITERALEXPR) { ///
+        if (!lookup(source_expr.name)) {
+            enter(source_expr.name);
+            fprintf(temp_data_stg, "dir_%s: .word 0\n", source_expr.name);
+
+            fprintf(output, "\n\tldr r0, =dir_");
+            fprintf(output, extract(source_expr));
+            fprintf(output, "\n");
+
+            fprintf(output, "\tldr r1, =");
+            fprintf(output, extract(target));
+            fprintf(output, "\n");
+
+            fprintf(output, "\tmov r2, r1\n");
+            fprintf(output, "\tstr r2, [r0]\n");
+        } else {
+            fprintf(output, "\n\tldr r0, =dir_");
+            fprintf(output, extract(source_expr));
+            fprintf(output, "\n");
+
+            fprintf(output, "\tldr r1, =");
+            fprintf(output, extract(target));
+            fprintf(output, "\n");
+
+            fprintf(output, "\tmov r2, r1\n");
+            fprintf(output, "\tstr r2, [r0]\n");
+        }
+    } ///
+
 	if (source_expr.kind == LITERALEXPR && target.kind == TEMPEXPR) {
 		fprintf(output, "\n\tldr r0, =");
 		fprintf(output, extract(target));
@@ -132,13 +161,13 @@ void assign(expr_rec target, expr_rec source_expr) {
 		fprintf(output, "\tstr r2, [r0]\n");
 	}
 
-	if (source_expr.kind == IDEXPR && target.kind == TEMPEXPR) {
+	/*if (source_expr.kind == IDEXPR && target.kind == TEMPEXPR) {
 		fprintf(output, "\tldr r2, =%s\n", target.name);
 
 		fprintf(output, "\tldr r3, =dir_"); ///
 		fprintf(output, extract(source_expr)); 
 		fprintf(output, "\n");
-	}
+	}*/
 
 	if (source_expr.kind == IDEXPR && target.kind == IDEXPR) {
 		char *tmp_reg = get_temp();
@@ -210,7 +239,7 @@ expr_rec gen_infix(expr_rec e1, op_rec op, expr_rec e2) {
 		// Genera el codigo por una operacion infix.
 		// Se obtiene el resultado y se crea un record semantico para este.
 
-		strcpy(e_rec.name, get_temp());
+		e_rec.name = get_temp();
 		enter(e_rec.name);
 		fprintf(temp_data_stg, "%s: .word 0\n", e_rec.name);
 		if (e1.kind == LITERALEXPR) {
@@ -243,7 +272,7 @@ expr_rec gen_infix(expr_rec e1, op_rec op, expr_rec e2) {
 			fprintf(output, "\n");
 		} else if (e2.kind == IDEXPR) {
 			// ldr r3, =dir_<e2>
-			fprintf(output, "\n\tldr r3, ="); ///
+			fprintf(output, "\n\tldr r3, =dir_"); 
 			fprintf(output, extract(e2));
 			fprintf(output, "\n");
 
@@ -316,27 +345,28 @@ expr_rec process_literal(char *token) {
 
 // Escribe una expresion en el archivo ensamblador.
 void write_expr(expr_rec out_expr) {
+	fprintf(output, "\n\tldr r0, =string\n");
 	if (out_expr.kind == INTLITERAL) {
 		// ldr r1, =<out_expr>
-		fprintf(output, "\n\tldr r1, =");
+		fprintf(output, "\tldr r1, =");
 		fprintf(output, extract(out_expr));
 		fprintf(output, "\n");
 	} else if (out_expr.kind == IDEXPR) {
 		// ldr r2, =dir_<out_expr>
-		fprintf(output, "\n\tldr r2, =dir_");
+		fprintf(output, "\tldr r1, =dir_");
 		fprintf(output, extract(out_expr));
 		fprintf(output, "\n");
 
 		// ldr r1, [r2]
-		fprintf(output, "\tldr r1, [r2]\n");
+		fprintf(output, "\tldr r1, [r1]\n");
 	} else {
 		// ldr r2, =<out_expr>
-		fprintf(output, "\n\tldr r2, =");
+		fprintf(output, "\tldr r1, =");
 		fprintf(output, extract(out_expr));
 		fprintf(output, "\n");
 
 		// ldr r1, [r2]
-		fprintf(output, "\tldr r1, [r2]\n");
+		fprintf(output, "\tldr r1, [r1]\n");
 	}
 	fprintf(output, "\tbl printf\n");
 }
@@ -353,7 +383,7 @@ char *extract(expr_rec expr) {
 	}
 
 	return data;
-}
+} 
 
 // Extrae la operacion de una expresion.
 char *extract_op(op_rec op) {

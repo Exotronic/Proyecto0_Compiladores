@@ -135,14 +135,16 @@ void expression(expr_rec *target) {
 	int print_flag = 0;
 
 	// Si el target es NULL es porque se tiene que imprimir.
-	if (target == NULL) {
-		char *tmp = get_temp();
-		expr_rec tmp_expr = process_temp(tmp);
+    if (target == NULL) {
+        char *tmp = get_temp();
+        enter(tmp);
+        fprintf(temp_data_stg, "%s: .word 0\n", tmp);
+        expr_rec tmp_expr = process_temp(tmp);
 
-		target = &tmp_expr;
+        target = &tmp_expr;
 
-		print_flag = 1;
-	}
+        print_flag = 1;
+    }
 
 	expr_rec op1 = primary(*target);
 	for (t = next_token(); t == PLUSOP || t == MINUSOP; t = next_token()) {
@@ -151,12 +153,22 @@ void expression(expr_rec *target) {
 		op1 = gen_infix(op1, op, op2);
 	}
 
+	///////////
 	if (op1.kind == IDEXPR) {
-		char *tmp = get_temp();
-		expr_rec tmp_expr = process_temp(tmp);
-		assign(tmp_expr, op1);
-		*target = tmp_expr;
-	}
+        char *tmp = get_temp();
+        enter(tmp);
+        fprintf(temp_data_stg, "%s: .word 0\n", tmp);
+        expr_rec tmp_expr = process_temp(tmp);
+        assign(tmp_expr, op1);
+        *target = tmp_expr;
+    } if (op1.kind == IDEXPR) {
+        char *tmp = get_temp();
+        enter(tmp);
+        fprintf(temp_data_stg, "%s: .word 0\n", tmp);
+        expr_rec tmp_expr = process_temp(tmp);
+        assign(tmp_expr, op1);
+        *target = tmp_expr;
+    }
 
 	else {
 		assign(*target, op1);
